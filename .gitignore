@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+
+# Security-sensitive files
+*.env
+
+# Misc
+.DS_Store
+.idea/
+.vscode/
+*.log

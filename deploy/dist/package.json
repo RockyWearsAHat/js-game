@@ -1,0 +1,67 @@
+{
+  "name": "parkour-3d",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite --host\" \"tsc --watch\" \"wait-on http://localhost:5173 && wait-on dist/main.js && cross-env NODE_ENV=development electron .\"",
+    "dev:simple": "npx vite",
+    "dev:electron": "cross-env NODE_ENV=development electron .",
+    "start:server": "node dist/server/game-server.js",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.electron.json",
+    "start": "cross-env NODE_ENV=production electron .",
+    "clean": "rimraf dist",
+    "rebuild": "npm run clean && npm run build",
+    "package": "npm run build && electron-builder build --mac --win",
+    "package:mac": "npm run build && electron-builder build --mac",
+    "package:win": "npm run build && electron-builder build --win"
+  },
+  "keywords": [
+    "game",
+    "3d",
+    "battlefield"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "A simple 3D game with a movable cube",
+  "dependencies": {
+    "electron": "^37.2.0",
+    "three": "^0.178.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "@types/three": "^0.178.0",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^9.2.0",
+    "cross-env": "^7.0.3",
+    "electron-builder": "^26.0.12",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.8.3",
+    "vite": "^5.2.6",
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.alexwaldmann.battlefield3d",
+    "productName": "Battlefield 3D",
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "index.html",
+      "package.json"
+    ],
+    "directories": {
+      "output": "build"
+    },
+    "mac": {
+      "category": "public.app-category.games"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

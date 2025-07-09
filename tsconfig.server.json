@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "composite": true,
+    "rootDir": "./src",
+    "types": ["node"]
+  },
+  "include": [
+    "src/server/**/*.ts",
+    "src/core/**/*.ts",
+    "src/physics/**/*.ts"
+  ],
+  "exclude": [
+    "src/client",
+    "src/main.ts",
+    "src/renderer.ts",
+    "src/core/game.ts",
+    "src/controllers",
+    "src/systems",
+    "src/utils",
+    "src/world"
+  ]
+}

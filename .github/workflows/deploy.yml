@@ -1,0 +1,63 @@
+name: Deploy Game Server
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build application
+      run: npm run build
+      
+    - name: Create deployment package
+      run: |
+        mkdir -p ./deploy/dist
+        cp -r ./dist ./package.json ./package-lock.json ./deploy/dist/
+    
+    - name: Deploy to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "deploy/dist/*,deploy/game-server.service"
+        target: "/home/ec2-user"
+        strip_components: 1
+        
+    - name: Configure and start server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /home/ec2-user/game-server
+          npm install --production
+          sudo mv /home/ec2-user/game-server.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable game-server
+          sudo systemctl restart game-server
+          sudo systemctl status game-server --no-pager
+          sudo systemctl daemon-reload && 
+          sudo systemctl enable game-server &&
+          sudo systemctl restart game-server
+        "
+        
+        # Cleanup
+        rm private_key.pem
