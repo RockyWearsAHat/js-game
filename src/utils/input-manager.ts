@@ -7,29 +7,23 @@ import { InputState } from "../core/types";
  * Handles all user input for the game (keyboard and mouse)
  */
 export class InputManager {
-  // Keyboard state
-  keys: { [key: string]: boolean } = {};
+  private keys: { [key: string]: boolean } = {};
+  private mouse = { x: 0, y: 0, dx: 0, dy: 0 };
+  private pointerLocked = false;
+  private eventListeners: { [key: string]: ((event: any) => void)[] } = {};
 
-  // Mouse state
-  isPointerLocked: boolean = false;
-  mouseX: number = 0;
-  mouseY: number = 0;
-  mouseSensitivity: number = 0.0015;
-
-  // Touch state (for mobile)
-  touchStartX: number = 0;
-  touchStartY: number = 0;
-  isTouching: boolean = false;
-
-  // References to HTML elements
-  canvas: HTMLElement;
-
-  /**
-   * Create a new input manager
-   */
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    this.setupEventListeners();
+  constructor(private canvas: HTMLElement) {
+    document.addEventListener("keydown", this.onKeyDown.bind(this), false);
+    document.addEventListener("keyup", this.onKeyUp.bind(this), false);
+    document.addEventListener("mousemove", this.onMouseMove.bind(this), false);
+    document.addEventListener("mousedown", this.onMouseDown.bind(this), false);
+    document.addEventListener("mouseup", this.onMouseUp.bind(this), false);
+    document.addEventListener("contextmenu", (e) => e.preventDefault(), false); // Disable right-click menu
+    document.addEventListener(
+      "pointerlockchange",
+      this.onPointerLockChange.bind(this),
+      false
+    );
 
     // REQUEST LOCK ON FIRST CLICK OR WHENEVER IT IS LOST
     const requestLock = () => canvas.requestPointerLock();
@@ -43,249 +37,116 @@ export class InputManager {
     });
   }
 
-  /**
-   * Set up all event listeners for input
-   */
-  setupEventListeners(): void {
-    // Keyboard events
-    document.addEventListener("keydown", this.handleKeyDown.bind(this));
-    document.addEventListener("keyup", this.handleKeyUp.bind(this));
-
-    // Mouse events
-    document.addEventListener("mousemove", this.handleMouseMove.bind(this));
-    document.addEventListener("mousedown", this.handleMouseDown.bind(this));
-    document.addEventListener("mouseup", this.handleMouseUp.bind(this));
-    document.addEventListener("contextmenu", (e) => e.preventDefault()); // Disable right-click menu
-
-    // Pointer lock events
-    document.addEventListener(
-      "pointerlockchange",
-      this.handlePointerLockChange.bind(this)
-    );
-
-    // Click on canvas to lock pointer
-    this.canvas.addEventListener("click", this.requestPointerLock.bind(this));
-
-    // Touch events (for mobile)
-    this.canvas.addEventListener(
-      "touchstart",
-      this.handleTouchStart.bind(this)
-    );
-    this.canvas.addEventListener("touchmove", this.handleTouchMove.bind(this));
-    this.canvas.addEventListener("touchend", this.handleTouchEnd.bind(this));
+  on(eventName: string, callback: (event: any) => void) {
+    if (!this.eventListeners[eventName]) {
+      this.eventListeners[eventName] = [];
+    }
+    this.eventListeners[eventName].push(callback);
   }
 
-  /**
-   * Handle key down event
-   */
-  handleKeyDown(event: KeyboardEvent): void {
-    // Store the key state by its code
+  private emit(eventName: string, event: any) {
+    if (this.eventListeners[eventName]) {
+      for (const callback of this.eventListeners[eventName]) {
+        callback(event);
+      }
+    }
+  }
+
+  private onKeyDown(event: KeyboardEvent) {
     this.keys[event.code] = true;
-
-    // Also store the key by its key value for better compatibility
-    this.keys[event.key] = true;
-
-    console.log(`Key down: ${event.key} (${event.code})`);
-
-    // Emergency key to clear stuck inputs
-    if (event.code === "KeyX" || event.key === "x" || event.key === "X") {
-      console.log("🔧 Manual key reset triggered by X key");
-      this.clearAllMovementKeys();
-      return;
-    }
-
-    // Prevent default behavior for game-related keys
-    if (
-      [
-        "ArrowUp",
-        "ArrowDown",
-        "ArrowLeft",
-        "ArrowRight",
-        "KeyW",
-        "KeyA",
-        "KeyS",
-        "KeyD",
-        "Space",
-        "w",
-        "a",
-        "s",
-        "d",
-        " ",
-      ].includes(event.code) ||
-      ["w", "a", "s", "d", "W", "A", "S", "D", " "].includes(event.key)
-    ) {
-      event.preventDefault();
-    }
+    this.emit("keydown", event);
   }
 
-  /**
-   * Handle key up event
-   */
-  handleKeyUp(event: KeyboardEvent): void {
-    // Clear both code and key mappings
+  private onKeyUp(event: KeyboardEvent) {
     this.keys[event.code] = false;
-    this.keys[event.key] = false;
-
-    // Also clear common variations to prevent stuck keys
-    if (event.code === "KeyW") {
-      this.keys["w"] = false;
-      this.keys["W"] = false;
-      this.keys["KeyW"] = false;
-    }
-    if (event.code === "KeyS") {
-      this.keys["s"] = false;
-      this.keys["S"] = false;
-      this.keys["KeyS"] = false;
-    }
-    if (event.code === "KeyA") {
-      this.keys["a"] = false;
-      this.keys["A"] = false;
-      this.keys["KeyA"] = false;
-    }
-    if (event.code === "KeyD") {
-      this.keys["d"] = false;
-      this.keys["D"] = false;
-      this.keys["KeyD"] = false;
-    }
-
-    console.log(
-      `Key up: ${event.key} (${event.code}) - cleared multiple variations`
-    );
-  }
-
-  /**
-   * Force clear all movement keys (emergency reset)
-   */
-  clearAllMovementKeys(): void {
-    const movementKeys = [
-      "KeyW",
-      "KeyS",
-      "KeyA",
-      "KeyD",
-      "w",
-      "W",
-      "s",
-      "S",
-      "a",
-      "A",
-      "d",
-      "D",
-      "ArrowUp",
-      "ArrowDown",
-      "ArrowLeft",
-      "ArrowRight",
-    ];
-    movementKeys.forEach((key) => {
-      this.keys[key] = false;
-    });
-    console.log("🔧 Force cleared all movement keys");
   }
 
   /**
    * Handle mouse move event
    */
-  handleMouseMove(event: MouseEvent): void {
-    if (this.isPointerLocked) {
-      this.mouseX = event.movementX || 0;
-      this.mouseY = event.movementY || 0;
-    } else {
-      this.mouseX = 0;
-      this.mouseY = 0;
+  onMouseMove(event: MouseEvent): void {
+    if (this.pointerLocked) {
+      this.mouse.dx += event.movementX;
+      this.mouse.dy += event.movementY;
     }
+    this.mouse.x = event.clientX;
+    this.mouse.y = event.clientY;
   }
 
   /**
    * Handle mouse down event
    */
-  handleMouseDown(event: MouseEvent): void {
-    if (!this.isPointerLocked) {
-      this.requestPointerLock();
-    } else {
-      // Track mouse button states
-      this.keys[`mouse${event.button}`] = true;
+  onMouseDown(event: MouseEvent): void {
+    // Use event.button to check for left (0), middle (1), or right (2) mouse button
+    if (event.button === 0) {
+      this.keys["mouse0"] = true;
+      this.keys["fire"] = true; // a more generic alias
+    } else if (event.button === 2) {
+      this.keys["mouse2"] = true;
+      this.keys["aim"] = true; // a more generic alias
     }
   }
 
   /**
    * Handle mouse up event
    */
-  handleMouseUp(event: MouseEvent): void {
-    // Clear mouse button states
-    this.keys[`mouse${event.button}`] = false;
-  }
-
-  /**
-   * Handle pointer lock change
-   */
-  handlePointerLockChange(): void {
-    console.log("Pointer lock change event triggered");
-    const wasLocked = this.isPointerLocked;
-    this.isPointerLocked = document.pointerLockElement === this.canvas;
-    console.log("Pointer locked:", this.isPointerLocked);
-
-    // Reset mouse movement values when lock state changes
-    if (wasLocked !== this.isPointerLocked) {
-      this.mouseX = 0;
-      this.mouseY = 0;
-    }
-
-    // Update UI elements based on pointer lock state
-    const prompt = document.getElementById("prompt");
-    if (prompt) {
-      prompt.classList.toggle("hidden", this.isPointerLocked);
+  onMouseUp(event: MouseEvent): void {
+    if (event.button === 0) {
+      this.keys["mouse0"] = false;
+      this.keys["fire"] = false;
+    } else if (event.button === 2) {
+      this.keys["mouse2"] = false;
+      this.keys["aim"] = false;
     }
   }
 
   /**
-   * Request pointer lock on the canvas
+   * Handle pointer lock change event
    */
-  requestPointerLock(): void {
-    try {
-      if (!this.isPointerLocked) {
-        console.log("Requesting pointer lock on canvas");
-        this.canvas.requestPointerLock();
-      }
-    } catch (error) {
-      console.error("Failed to request pointer lock:", error);
+  onPointerLockChange(): void {
+    this.pointerLocked = document.pointerLockElement === this.canvas;
+  }
+
+  lockPointer() {
+    if (!this.pointerLocked) {
+      this.canvas.requestPointerLock();
+    }
+  }
+
+  unlockPointer() {
+    if (this.pointerLocked) {
+      document.exitPointerLock();
     }
   }
 
   /**
-   * Handle touch start event (for mobile)
+   * Emergency key to clear stuck inputs
    */
-  handleTouchStart(event: TouchEvent): void {
-    if (event.touches.length > 0) {
-      this.touchStartX = event.touches[0].clientX;
-      this.touchStartY = event.touches[0].clientY;
-      this.isTouching = true;
-    }
+  clearAllMovementKeys(): void {
+    this.keys["KeyW"] = false;
+    this.keys["KeyA"] = false;
+    this.keys["KeyS"] = false;
+    this.keys["KeyD"] = false;
+    this.keys["Space"] = false;
+    this.keys["ShiftLeft"] = false;
+    this.keys["KeyC"] = false;
+    this.keys["moveForward"] = false;
+    this.keys["moveBackward"] = false;
+    this.keys["moveLeft"] = false;
+    this.keys["moveRight"] = false;
+    this.keys["jump"] = false;
+    this.keys["sprint"] = false;
+    this.keys["crouch"] = false;
   }
 
   /**
-   * Handle touch move event (for mobile)
+   * Get the current mouse movement delta and reset it.
    */
-  handleTouchMove(event: TouchEvent): void {
-    if (this.isTouching && event.touches.length > 0) {
-      const touchX = event.touches[0].clientX;
-      const touchY = event.touches[0].clientY;
-
-      // Calculate movement deltas
-      this.mouseX = (touchX - this.touchStartX) * 0.5;
-      this.mouseY = (touchY - this.touchStartY) * 0.5;
-
-      // Update starting position for next move
-      this.touchStartX = touchX;
-      this.touchStartY = touchY;
-    }
-  }
-
-  /**
-   * Handle touch end event (for mobile)
-   */
-  handleTouchEnd(_event: TouchEvent): void {
-    this.isTouching = false;
-    this.mouseX = 0;
-    this.mouseY = 0;
+  getMouseDelta() {
+    const delta = { dx: this.mouse.dx, dy: this.mouse.dy };
+    this.mouse.dx = 0;
+    this.mouse.dy = 0;
+    return delta;
   }
 
   /**
@@ -396,18 +257,34 @@ export class InputManager {
     return direction;
   }
 
+  isJumping(): boolean {
+    return this.keys["Space"] || this.keys[" "] || false;
+  }
+
+  isCrouching(): boolean {
+    return this.keys["KeyC"] || this.keys["ControlLeft"] || this.keys["c"] || this.keys["C"] || this.keys["Control"] || false;
+  }
+
+  isSprinting(): boolean {
+    return this.keys["ShiftLeft"] || this.keys["ShiftRight"] || this.keys["Shift"] || false;
+  }
+
+  isFiring(): boolean {
+    return this.keys["mouse0"] || false;
+  }
+
   /**
    * Get current rotation input for camera
    */
   getCameraRotation(): { x: number; y: number } {
     const rotation = {
-      x: -this.mouseY * this.mouseSensitivity, // Pitch (look up/down) - negative for natural feel
-      y: -this.mouseX * this.mouseSensitivity, // Yaw (look left/right) - negative for natural feel
+      x: -this.mouse.y * this.mouseSensitivity, // Pitch (look up/down) - negative for natural feel
+      y: -this.mouse.x * this.mouseSensitivity, // Yaw (look left/right) - negative for natural feel
     };
 
     // Reset mouse movement to prevent continuous rotation
-    this.mouseX = 0;
-    this.mouseY = 0;
+    this.mouse.x = 0;
+    this.mouse.y = 0;
 
     return rotation;
   }
@@ -455,7 +332,7 @@ export class InputManager {
         this.keys["Control"] ||
         false,
       fire: this.keys["mouse0"] || false, // Left mouse button
-      reload: this.keys["KeyR"] || this.keys["r"] || this.keys["R"] || false,
+      reset: this.keys["KeyR"] || this.keys["r"] || this.keys["R"] || false,
       aim: this.keys["mouse2"] || false, // Right mouse button
     };
   }
@@ -471,6 +348,23 @@ export class InputManager {
    * Check if pointer is locked
    */
   isPointerLockActive(): boolean {
-    return this.isPointerLocked;
+    return this.pointerLocked;
+  }
+
+  /**
+   * Get current state of the input manager
+   */
+  getState() {
+    return {
+      forward: this.keys["KeyW"],
+      backward: this.keys["KeyS"],
+      left: this.keys["KeyA"],
+      right: this.keys["KeyD"],
+      jump: this.keys["Space"],
+      sprint: this.keys["ShiftLeft"] || this.keys["ShiftRight"],
+      crouch: this.keys["KeyC"],
+      reset: this.keys["KeyR"],
+      help: this.keys["KeyH"],
+    };
   }
 }

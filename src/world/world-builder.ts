@@ -15,16 +15,6 @@ export class WorldBuilder {
    */
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-
-    // Add an immediately visible object to test rendering
-    console.log("DEBUG: Adding test cube to scene to verify rendering");
-    const testGeometry = new THREE.BoxGeometry(10, 10, 10);
-    const testMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const testCube = new THREE.Mesh(testGeometry, testMaterial);
-    testCube.position.set(0, 5, -15);
-    this.scene.add(testCube);
-    console.log("DEBUG: Test cube added to scene");
-
     this.loadTextures();
   }
 
@@ -72,9 +62,10 @@ export class WorldBuilder {
   buildWorld(): THREE.Object3D[] {
     console.log("DEBUG: WorldBuilder.buildWorld() called");
 
-    // Clear existing objects
+    // Clear existing objects from the scene
+    this.objects.forEach((obj) => this.scene.remove(obj));
     this.objects = [];
-    console.log("DEBUG: Objects array cleared");
+    console.log("DEBUG: Objects array and scene cleared");
 
     // Check if the scene exists
     if (!this.scene) {

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Game } from "./core/game";
+import { ClientGame } from "./client-game";
 
 /**
  * Parkour 3D Game
@@ -15,7 +15,7 @@ import { Game } from "./core/game";
 // Make game globally accessible for debugging
 declare global {
   interface Window {
-    game: Game;
+    game: ClientGame;
     debugInfo: any;
     showActionPrompt: (text: string) => void;
     hideActionPrompt: () => void;
@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const container = document.body;
     console.log("Container element:", container);
 
-    const game = new Game(container);
+    const game = new ClientGame(container);
     console.log("Game instance created");
 
     // Make game globally available for debugging
@@ -48,10 +48,19 @@ document.addEventListener("DOMContentLoaded", () => {
     game.start();
 
     // Update debug info
-    window.debugInfo.sceneChildren = game.scene.children.length;
-    window.debugInfo.objectsCount = game.objects.length;
-    window.debugInfo.rendererExists = !!game.renderer;
-    window.debugInfo.cameraExists = !!game.camera;
+    if (game.scene) {
+        window.debugInfo.sceneChildren = game.scene.children.length;
+    }
+    if (game.objects) {
+        window.debugInfo.objectsCount = game.objects.length;
+    }
+    if (game.renderer) {
+        window.debugInfo.rendererExists = !!game.renderer;
+    }
+    if (game.camera) {
+        window.debugInfo.cameraExists = !!game.camera;
+    }
+    
 
     console.log("Game started successfully");
     console.log("Debug info:", window.debugInfo);

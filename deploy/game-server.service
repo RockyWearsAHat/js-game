@@ -1,14 +1,14 @@
 [Unit]
 Description=Game Server
+After=network.target
 
 [Service]
-ExecStart=/usr/bin/node /home/ec2-user/game-server/server/game-server.js
+# The Node.js executable is now in a standard system path
+ExecStart=/usr/bin/node %APP_DIR%/dist/server/game-server.js
 Restart=always
 User=ec2-user
-Group=ec2-user
-Environment=PATH=/usr/bin:/usr/local/bin
 Environment=NODE_ENV=production
-WorkingDirectory=/home/ec2-user/game-server
+WorkingDirectory=%APP_DIR%
 
 [Install]
 WantedBy=multi-user.target

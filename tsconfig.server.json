@@ -1,11 +1,14 @@
 {
-  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "./dist",
+    "target": "ES2020",
     "module": "CommonJS",
     "moduleResolution": "node",
-    "composite": true,
+    "outDir": "./dist",
     "rootDir": "./src",
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
     "types": ["node"]
   },
   "include": [
@@ -14,13 +17,6 @@
     "src/physics/**/*.ts"
   ],
   "exclude": [
-    "src/client",
-    "src/main.ts",
-    "src/renderer.ts",
-    "src/core/game.ts",
-    "src/controllers",
-    "src/systems",
-    "src/utils",
-    "src/world"
+    "node_modules"
   ]
 }

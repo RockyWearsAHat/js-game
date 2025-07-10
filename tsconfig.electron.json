@@ -8,11 +8,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "dist",
+    "outDir": "dist/electron",
     "sourceMap": true,
     "resolveJsonModule": true,
     "lib": ["es2020"]
   },
-  "include": ["main.ts"],
-  "exclude": ["node_modules", "src/server", "server"]
+  "include": ["electron.ts"],
+  "exclude": ["node_modules"]
 }

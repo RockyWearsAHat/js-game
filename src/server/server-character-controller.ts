@@ -141,7 +141,7 @@ export class ServerCharacterController {
    * Handle sprinting logic
    */
   handleSprinting(isSprintPressed: boolean): void {
-    this.isSprinting = isSprintPressed && !this.isCrouching;
+    this.isSprinting = isSprintPressed && this.isOnGround && !this.isCrouching;
   }
 
   /**
@@ -218,15 +218,20 @@ export class ServerCharacterController {
    * Get the current state of the character
    */
   getState(): CharacterState {
+    // The view direction will be derived from the yaw on the client side for now.
+    // This should be improved to use the quaternion directly.
+    const viewDirection = new THREE.Vector3(0, 0, -1);
+    viewDirection.applyQuaternion(this.quaternion);
+
     return {
+      position: this.position,
+      velocity: this.velocity,
+      viewDirection: viewDirection,
       isOnGround: this.isOnGround,
       isJumping: this.isJumping,
       isCrouching: this.isCrouching,
-      isSliding: false, // Implement sliding logic if needed
       isSprinting: this.isSprinting,
-      isGrabbingLedge: this.isGrabbingLedge,
-      isMantling: this.isMantling,
-      isWallRunning: this.isWallRunning,
+      yaw: this.yaw,
     };
   }
 }

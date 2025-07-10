@@ -75,6 +75,9 @@ export class CharacterController {
   debugInfo: any = {};
 
   private static readonly GROUND_TOLERANCE = 0.25;   // keep in sync with CollisionSystem
+  private pitch: number = 0;
+  public yaw: number = 0;
+  private mouseSensitivity: number = 0.002;
 
   /**
    * Create a new character controller
@@ -100,7 +103,7 @@ export class CharacterController {
     // Set current dimensions
     this.height = this.standingHeight;
     this.eyeHeight = this.standingEyeHeight;
-    this.radius = 0.35;
+    this.radius = 0.4;
 
     // Initialize states
     this.isOnGround = false;
@@ -112,23 +115,60 @@ export class CharacterController {
     this.canJump = true;
     this.jumpCooldown = 0;
     this.canMantleTimer = 0;
-    this.isWallRunning = false;
-    this.wallRunTimer = 0;
+
+    // Movement params
+    this.walkSpeed = 5.0; // Faster base movement
+    this.sprintSpeed = 8.0; // Much faster sprint for dynamic gameplay
+    this.crouchSpeed = 3.0; // Slightly faster crouch
+    this.airControl = 0.6; // Better air control for parkour
+    this.jumpForce = 8.0;
+    this.groundedTimer = 0;
+
+    // Head bobbing
     this.headBobActive = false;
     this.headBobTimer = 0;
     this.headBobAmount = 0.05;
-    this.groundedTimer = 0;
+  }
 
-    // Store camera reference
-    this.cameraObject = camera;
+  public handleMouseMove(dx: number, dy: number): void {
+    if (!this.isLocalPlayer || !this.cameraObject) return;
+    this.updateCamera(dx, dy);
+  }
 
-    // Initialize movement speeds for dynamic, fluid gameplay
-    this.walkSpeed = 0.09; // Faster base movement
-    this.sprintSpeed = 0.16; // Much faster sprint for dynamic gameplay
-    this.crouchSpeed = 0.05; // Slightly faster crouch
-    this.airControl = 0.6; // Better air control for parkour
-    this.jumpForce = 0.2; // Higher jump for better parkour
-    this.currentFOV = this.defaultFOV;
+  public updateCamera(dx: number, dy: number): void {
+    if (!this.cameraObject) return;
+
+    this.yaw -= dx * this.mouseSensitivity;
+    this.pitch -= dy * this.mouseSensitivity;
+
+    // Clamp pitch to prevent camera flipping
+    this.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.pitch));
+
+    this.cameraObject.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
+  }
+
+  /**
+   * Resets the character's position and velocity to a default state.
+   */
+  public reset(): void {
+    this.position.set(0, 10, 0); // Reset to a safe position above the ground
+    this.velocity.set(0, 0, 0);
+    this.pitch = 0;
+    this.yaw = 0;
+    this.isJumping = false;
+    this.isOnGround = false;
+    console.log("Character position reset.");
+  }
+
+  /**
+   * Set the initial position of the character
+   * @param position - The initial position vector.
+   */
+  setInitialPosition(position: { x: number; y: number; z: number }): void {
+    this.position.set(position.x, position.y, position.z);
+    if (this.cameraObject) {
+      this.cameraObject.position.set(position.x, position.y + this.eyeHeight, position.z);
+    }
   }
 
   /**
@@ -148,6 +188,30 @@ export class CharacterController {
     isCrouchPressed: boolean,
     isSprintPressed: boolean
   ): void {
+    // ---------------- PRE-UPDATE CHECKS ----------------
+    // If on ground, reset vertical velocity before any calculations
+    if (this.isOnGround) {
+      this.velocity.y = 0;
+    }
+    // ----------------------------------------------------
+
+    // ---------------- CROUCHING LOGIC ----------------
+    if (isCrouchPressed) {
+      if (!this.isCrouching) {
+        this.isCrouching = true;
+        this.height = this.crouchHeight;
+        this.eyeHeight = this.crouchEyeHeight;
+      }
+    } else {
+      if (this.isCrouching) {
+        // TODO: Add a check for space above before standing up
+        this.isCrouching = false;
+        this.height = this.standingHeight;
+        this.eyeHeight = this.standingEyeHeight;
+      }
+    }
+    // ----------------------------------------------------
+
     // ---------------- NORMALISE INPUT ----------------
     const normInput = inputDirection.clone();
     normInput.y = 0;                              // ignore vertical
@@ -170,7 +234,7 @@ export class CharacterController {
     this.handleSprinting(isSprintPressed);
 
     // Apply movement (horizontal) with normalised input
-    this.applyMovement(normInput);
+    this.applyMovement(normInput, deltaTime);
 
     // Handle ledge grabbing and mantling before applying gravity
     this.handleLedgeGrabbing(objects);
@@ -265,7 +329,7 @@ export class CharacterController {
     }
 
     // Apply velocity to position with improved collision handling
-    const newPosition = this.position.clone().add(this.velocity);
+    const newPosition = this.position.clone().add(this.velocity.clone().multiplyScalar(deltaTime));
 
     // Full collision check with enhanced safety
     const collisionResult = this.checkFullCollision(newPosition, objects);
@@ -273,6 +337,11 @@ export class CharacterController {
     // Update position and ground state
     this.position.copy(collisionResult.adjustedPosition);
     this.isOnGround = collisionResult.isOnGround;
+
+    // If we are on the ground, clamp vertical velocity to zero to prevent jittering.
+    if (this.isOnGround) {
+        this.velocity.y = 0;
+    }
 
     // allow jump even if slightly above ground while moving fast
     if (
@@ -369,6 +438,27 @@ export class CharacterController {
   }
 
   /**
+   * Get the current state of the character.
+   */
+  getState(): CharacterState {
+    const viewDirection = new THREE.Vector3(0, 0, -1);
+    if (this.cameraObject) {
+      viewDirection.applyQuaternion(this.cameraObject.quaternion);
+    }
+
+    return {
+      position: this.position.clone(),
+      velocity: this.velocity.clone(),
+      viewDirection: viewDirection,
+      yaw: this.yaw, // Add yaw to the state
+      isCrouching: this.isCrouching,
+      isSprinting: this.isSprinting,
+      isJumping: this.isJumping,
+      isOnGround: this.isOnGround,
+    };
+  }
+
+  /**
    * Handle crouching state changes
    */
   handleCrouching(isCrouchPressed: boolean): void {
@@ -419,111 +509,42 @@ export class CharacterController {
   /**
    * FLUID MOVEMENT SYSTEM - Fast, responsive, COD + Mirror's Edge feel
    */
-  applyMovement(inputDirection: THREE.Vector3): void {
-    // Enhanced movement speeds for more dynamic gameplay
-    let currentSpeed = this.walkSpeed;
-    if (this.isSprinting) {
-      currentSpeed = this.sprintSpeed;
-    } else if (this.isCrouching) {
-      currentSpeed = this.crouchSpeed;
-    }
+  applyMovement(inputDirection: THREE.Vector3, deltaTime: number): void {
+    const currentSpeed = this.isSprinting
+      ? this.sprintSpeed
+      : this.isCrouching
+      ? this.crouchSpeed
+      : this.walkSpeed;
 
-    const hasInput = inputDirection.length() > 0.01;
-    const velocityMagnitude = Math.sqrt(
-      this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
+    const moveDirection = new THREE.Vector3(
+      inputDirection.x,
+      0,
+      inputDirection.z
     );
 
-    // GROUND MOVEMENT - Snappy and responsive
-    if (this.isOnGround) {
-      if (hasInput) {
-        // RESPONSIVE ACCELERATION - Much faster response
-        const acceleration = this.isSliding ? 0.4 : 0.25; // Increased for snappier feel
+    // Apply air control factor if not on ground
+    const controlFactor = this.isOnGround ? 1.0 : this.airControl;
 
-        // Calculate target velocity
-        const targetVelX = inputDirection.x * currentSpeed;
-        const targetVelZ = inputDirection.z * currentSpeed;
+    // Calculate target velocity
+    const targetVelocity = moveDirection.clone().multiplyScalar(
+      currentSpeed * controlFactor
+    );
 
-        // Quick acceleration towards target
-        this.velocity.x += (targetVelX - this.velocity.x) * acceleration;
-        this.velocity.z += (targetVelZ - this.velocity.z) * acceleration;
-
-        // Sliding physics
-        if (this.isSliding) {
-          const slideFriction = 0.97; // Smoother sliding
-          this.velocity.x *= slideFriction;
-          this.velocity.z *= slideFriction;
-
-          if (velocityMagnitude < 0.02) {
-            this.isSliding = false;
-          }
-        }
-      } else {
-        // RESPONSIVE DECELERATION - Stops more naturally
-        const friction = this.isSliding ? 0.94 : 0.88; // Better friction values
-
-        this.velocity.x *= friction;
-        this.velocity.z *= friction;
-
-        // Clean up tiny velocities
-        if (Math.abs(this.velocity.x) < 0.008) this.velocity.x = 0;
-        if (Math.abs(this.velocity.z) < 0.008) this.velocity.z = 0;
-
-        if (this.isSliding && velocityMagnitude < 0.015) {
-          this.isSliding = false;
-        }
-      }
-    }
-    // AIR MOVEMENT - More control for parkour gameplay
-    else {
-      if (hasInput) {
-        // Enhanced air control for better parkour feel
-        const airInfluence = 0.08; // Increased air control
-        const maxAirSpeed = currentSpeed * 1.4; // Allow faster air movement
-
-        // Calculate desired air movement
-        const desiredVelX = inputDirection.x * maxAirSpeed;
-        const desiredVelZ = inputDirection.z * maxAirSpeed;
-
-        // Apply air control with momentum preservation
-        this.velocity.x += (desiredVelX - this.velocity.x) * airInfluence;
-        this.velocity.z += (desiredVelZ - this.velocity.z) * airInfluence;
-
-        // Smart speed limiting - only limit if going too fast in input direction
-        const newHorizontalSpeed = Math.sqrt(
-          this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z
-        );
-        const inputAlignment = new THREE.Vector3(
-          this.velocity.x,
-          0,
-          this.velocity.z
-        )
-          .normalize()
-          .dot(inputDirection);
-
-        if (newHorizontalSpeed > maxAirSpeed && inputAlignment > 0.5) {
-          const scale = maxAirSpeed / newHorizontalSpeed;
-          this.velocity.x *= scale;
-          this.velocity.z *= scale;
-        }
-      }
-
-      // Preserve momentum perfectly in air for fluid parkour chains
-    }
+    // Use a frame-rate independent acceleration model instead of a fixed-alpha lerp
+    const acceleration = this.isOnGround ? 30.0 : 15.0; // Higher for snappier ground movement
+    const currentVelocityXZ = new THREE.Vector3(this.velocity.x, 0, this.velocity.z);
+    const deltaVelocity = targetVelocity.sub(currentVelocityXZ);
+    
+    this.velocity.x += deltaVelocity.x * acceleration * deltaTime;
+    this.velocity.z += deltaVelocity.z * acceleration * deltaTime;
   }
 
   /**
-   * Apply gravity to velocity
+   * Apply gravity to the character
    */
   applyGravity(deltaTime: number): void {
-    const gravityValue = 0.009;
-    const terminalVelocity = 0.35;
-
-    this.velocity.y -= gravityValue * deltaTime * 60;
-
-    // Apply terminal velocity
-    if (this.velocity.y < -terminalVelocity) {
-      this.velocity.y = -terminalVelocity;
-    }
+    const GRAVITY = 22.0; // A bit stronger gravity for a less "floaty" feel
+    this.velocity.y -= GRAVITY * deltaTime;
   }
 
   /**
@@ -549,16 +570,12 @@ export class CharacterController {
     // Force player slightly off the ground to ensure clean jump
     this.position.y += 0.05;
 
-    // Apply vertical jump force with sprint bonus
-    const jumpMultiplier = this.isSprinting ? 1.3 : 1.0; // Even better sprint bonus
-    const baseJumpForce = 0.26; // Higher base jump for better feel
-    this.velocity.y = baseJumpForce * jumpMultiplier;
-
-    // PRESERVE ALL HORIZONTAL MOMENTUM - crucial for parkour
-    // Don't modify X and Z velocity at all
+    // Apply vertical jump force
+    this.velocity.y = this.jumpForce;
 
     // Update state
     this.isOnGround = false;
+    this.isJumping = true;
     this.groundedTimer = 0;
 
     // NO setTimeout delays - completely unrestricted jumping
@@ -1139,8 +1156,7 @@ export class CharacterController {
         this.isGrabbingLedge = false;
         this.ledgeGrabPoint = null;
         this.ledgeGrabNormal = null;
-        if ((window as any).hideActionPrompt)
-          (window as any).hideActionPrompt();
+        if ((window as any).hideActionPrompt) (window as any).hideActionPrompt();
       }
     }
   }
@@ -1632,22 +1648,6 @@ export class CharacterController {
         isGrabbingLedge: this.isGrabbingLedge,
         isWallRunning: this.isWallRunning,
       },
-    };
-  }
-
-  /**
-   * Get current character state
-   */
-  getState(): CharacterState {
-    return {
-      isOnGround: this.isOnGround,
-      isJumping: this.isJumping,
-      isCrouching: this.isCrouching,
-      isSliding: this.isSliding,
-      isSprinting: this.isSprinting,
-      isGrabbingLedge: this.isGrabbingLedge,
-      isMantling: this.isMantling,
-      isWallRunning: this.isWallRunning,
     };
   }
 }

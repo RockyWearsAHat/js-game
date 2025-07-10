@@ -12,6 +12,7 @@ type PlayerInput = {
 type Player = {
 	id: string; ws: WebSocket;
 	pos: Vec3; vel: Vec3; health: number;
+	yaw: number;
 	input: PlayerInput;
 };
 type Bullet = { owner: string; pos: Vec3; dir: Vec3; life: number };
@@ -82,6 +83,7 @@ wss.on('connection', ws => {
 		pos: { x: (Math.random() - 0.5) * 10, y: 0, z: (Math.random() - 0.5) * 10 },
 		vel: { x: 0, y: 0, z: 0 },
 		health: 100,
+		yaw: 0,
 		input: {
 			forward: false, back: false, left: false, right: false,
 			shoot: false,
@@ -94,14 +96,20 @@ wss.on('connection', ws => {
 	ws.on('message', raw => {
 		try {
 			const data = JSON.parse(raw.toString());
+			console.log(`Received message from ${id}:`, data);
 			if (data.type === 'input') p.input = data.payload as PlayerInput;
+			if (data.type === 'playerState') {
+				p.pos = data.payload.position;
+				p.yaw = data.payload.yaw;
+			}
 		} catch { /* ignore malformed */ }
 	});
 	ws.on('close', () => players.delete(id));
 });
 
 setInterval(() => {
-	// 1. integrate player movement
+	// 1. integrate player movement (now handled client-side)
+	/*
 	for (const p of players.values()) {
 		const dir: Vec3 = { x: 0, y: 0, z: 0 };
 		if (p.input.forward) dir.z -= 1;
@@ -128,6 +136,7 @@ setInterval(() => {
 			p.input.shoot = false;
 		}
 	}
+	*/
 
 	// 2. integrate bullets
 	for (let i = bullets.length - 1; i >= 0; --i) {
@@ -161,12 +170,13 @@ setInterval(() => {
 	const snapshot = {
 		type: 'world',
 		players: [...players.values()].map(p => ({
-			id: p.id, pos: p.pos, health: p.health
+			id: p.id, pos: p.pos, health: p.health, yaw: p.yaw
 		})),
 		bullets: bullets.map(b => ({ pos: b.pos }))
 	};
 
 	const payload = JSON.stringify(snapshot);
+	// console.log('Broadcasting world state:', payload); 
 	for (const p of players.values()) {
 		if (p.ws.readyState === WebSocket.OPEN) {
 			p.ws.send(payload);

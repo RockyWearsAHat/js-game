@@ -1,12 +1,13 @@
 import * as THREE from 'three';
+import { PlayerState } from '../core/types';
 
 // ---------- types -------------------------------------------------
-export interface PlayerState {
-  id: string;
-  position: { x: number; y: number; z: number };
-  yaw?: number;
-  health?: number;
-}
+// export interface PlayerState {
+//   id: string;
+//   position: { x: number; y: number; z: number };
+//   yaw?: number;
+//   health?: number;
+// }
 type InitMsg = { playerId: string; players: PlayerState[] };
 type PlayerPatch = { id: string; position: { x: number; y: number; z: number }; yaw?: number };
 // ------------------------------------------------------------------
@@ -24,15 +25,17 @@ export class NetworkManager {
   private onPlayerStateUpdate: ((p: PlayerPatch) => void) | null = null;
   private debug = false;                       // off by default
 
-  constructor(url?: string) {
-    // build default URL from current page – works with `vite --host`
-    if (!url) {
-      const proto = location.protocol === "https:" ? "wss" : "ws";
-      const host  = location.hostname;
-      const port  = 8080;                        // keep in sync with server
-      url = `${proto}://${host}:${port}`;
-    }
-    this.connect(url);
+  constructor() {
+    const isProd = import.meta.env.PROD;
+		let url: string;
+		if (isProd) {
+			// production: wss://your-domain.com/ws/
+			url = `wss://${window.location.host}/ws/`;
+		} else {
+			// development: ws://localhost:8080
+			url = 'ws://localhost:8080';
+		}
+		this.connect(url);
   }
 
   // ---------------- connection ------------------------------------
@@ -110,15 +113,17 @@ export class NetworkManager {
    * broadcast current local transform to the server AFTER collision is resolved
    * Make sure this is called after collision detection completes
    */
-  public sendPlayerState(pos: THREE.Vector3, yaw = 0) {
+  public sendPlayerState(state: { position: THREE.Vector3, yaw: number }) {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
     
     // Send fully collision-checked position to server
     const packet = {
       type: "playerState",
-      id:   this.playerId,
-      position: { x: pos.x, y: pos.y, z: pos.z },
-      yaw
+      payload: {
+        id:   this.playerId,
+        position: { x: state.position.x, y: state.position.y, z: state.position.z },
+        yaw: state.yaw
+      }
     };
     if (this.debug) console.log("[ws→] playerState", packet);
     this.ws.send(JSON.stringify(packet));

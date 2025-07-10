@@ -1,21 +1,17 @@
 {
   "name": "parkour-3d",
   "version": "1.0.0",
-  "main": "dist/main.js",
+  "main": "dist/electron/game.js",
   "scripts": {
-    "dev": "concurrently \"vite --host\" \"tsc --watch\" \"wait-on http://localhost:5173 && wait-on dist/main.js && cross-env NODE_ENV=development electron .\"",
-    "dev:simple": "npx vite",
-    "dev:electron": "cross-env NODE_ENV=development electron .",
-    "start:server": "node dist/server/game-server.js",
-    "build": "npm run build:client && npm run build:server",
+    "start": "node dist/server/game-server.js",
+    "build": "rimraf dist && npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
-    "start": "cross-env NODE_ENV=production electron .",
+    "dev": "concurrently \"vite\" \"npm run build:server -- --watch\"",
+    "dev:electron": "npm run build && cross-env NODE_ENV=development electron .",
+    "package": "npm run build && electron-builder",
     "clean": "rimraf dist",
-    "rebuild": "npm run clean && npm run build",
-    "package": "npm run build && electron-builder build --mac --win",
-    "package:mac": "npm run build && electron-builder build --mac",
-    "package:win": "npm run build && electron-builder build --win"
+    "deploy": "npm run build && sh ./deploy/deploy.sh"
   },
   "keywords": [
     "game",

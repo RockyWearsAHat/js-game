@@ -9,7 +9,7 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html')
       }
     },
-    outDir: "./dist", // Output directly to dist in project root
+    outDir: "./dist/client", // Output to dist/client
     emptyOutDir: true,
   },
   server: {

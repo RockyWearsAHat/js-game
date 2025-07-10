@@ -16,24 +16,18 @@ export class NetworkClient {
 	private reconnectTimer: number | null = null;
 	private connected = false;
 
-	constructor(url = this.getServerUrl()) {
-		this.connectToServer(url);
-	}
-
-	private getServerUrl(): string {
-		// In production, use the EC2 IP or domain name
-		const serverHost = window.location.hostname;
-		
-		// If we're connecting from localhost, use the EC2 IP
-		if (serverHost === 'localhost' || serverHost === '127.0.0.1') {
-			return 'ws://44.250.70.176:8080';
+	constructor() {
+		const isProd = import.meta.env.PROD;
+		let url: string;
+		if (isProd) {
+			// production: wss://your-domain.com/ws/
+			url = `wss://${window.location.host}/ws/`;
+		} else {
+			// development: ws://localhost:8080
+			// url = 'ws://localhost:8080';
+			url = `wss://${window.location.host}/ws/`;
 		}
-		
-		// Otherwise use the same hostname where the page is hosted
-		const serverPort = '8080';
-		const protocol = 'ws';
-		
-		return `${protocol}://${serverHost}:${serverPort}`;
+		this.connectToServer(url);
 	}
 
 	private connectToServer(url: string): void {
@@ -51,6 +45,7 @@ export class NetworkClient {
 		
 		this.ws.addEventListener('message', evt => {
 			const data = JSON.parse(evt.data as string);
+			console.log('Received message from server:', data); // Added logging
 			if (data.type === 'welcome') this.id = data.id;
 			if (data.type === 'world')   this.world = data as WorldState;
 		});
@@ -71,6 +66,12 @@ export class NetworkClient {
 		this.ws.addEventListener('error', (err) => {
 			console.error('WebSocket error:', err);
 		});
+	}
+
+	sendPlayerState(state: any) {
+		if (this.ws.readyState === WebSocket.OPEN) {
+			this.ws.send(JSON.stringify({ type: 'playerState', payload: state }));
+		}
 	}
 
 	sendInput(input: InputState) {

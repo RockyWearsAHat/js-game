@@ -26,14 +26,14 @@ export interface CollisionResult {
 
 // Character state interface
 export interface CharacterState {
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  viewDirection: THREE.Vector3;
+  yaw: number;
   isOnGround: boolean;
   isJumping: boolean;
   isCrouching: boolean;
-  isSliding: boolean;
   isSprinting: boolean;
-  isGrabbingLedge: boolean;
-  isMantling: boolean;
-  isWallRunning: boolean;
 }
 
 // Input state interface
@@ -50,7 +50,12 @@ export interface InputState {
   aim: boolean;
 }
 
-
+export interface PlayerState {
+  id: string;
+  position: THREE.Vector3;
+  yaw: number;
+  health: number;
+}
 
 export interface WeaponState {
   currentAmmo: number;
